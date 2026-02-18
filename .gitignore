@@ -24,3 +24,8 @@ build/
 # 操作系统
 .DS_Store
 Thumbs.db
+
+# onlineshop 运行产物与安装包
+onlineshop/*.json
+onlineshop/*.exe
+onlineshop/.venv/

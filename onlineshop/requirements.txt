@@ -1,0 +1,4 @@
+selenium>=3.141.0
+beautifulsoup4>=4.12.0
+# matplotlib 可选（仅绘图时需要）；若 pip 安装失败可用系统包: apt install python3-matplotlib
+# matplotlib>=3.0.0

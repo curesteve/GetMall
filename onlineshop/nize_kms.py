@@ -1,13 +1,25 @@
+import os
+import sys
 import time
-import matplotlib.pyplot as plt
+import tempfile
 from datetime import datetime
 from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.chrome.options import Options
 from bs4 import BeautifulSoup
 import json
-plt.rcParams['font.sans-serif'] = ['SimHei']  # Windows系统使用
-plt.rcParams['axes.unicode_minus'] = False  # 正确显示负号
+
+# matplotlib 可选：未安装时仅无法绘图，抓取与保存 JSON 照常
+try:
+    import matplotlib.pyplot as plt
+    if sys.platform == 'win32':
+        plt.rcParams['font.sans-serif'] = ['SimHei']
+    else:
+        plt.rcParams['font.sans-serif'] = ['WenQuanYi Micro Hei', 'Noto Sans CJK SC', 'DejaVu Sans']
+    plt.rcParams['axes.unicode_minus'] = False
+    HAS_MATPLOTLIB = True
+except ImportError:
+    plt = None
+    HAS_MATPLOTLIB = False
 
 # 假设这是你的函数，用来获取库存数据
 # def fetch_stock_data():
@@ -27,10 +39,24 @@ plt.rcParams['axes.unicode_minus'] = False  # 正确显示负号
 
 
 
-def fetch_stock_data(url):
-    # 初始化 WebDriver
-    service = Service(ChromeDriverManager().install())
-    driver = webdriver.Chrome(service=service)
+def fetch_stock_data(url, headless=False):
+    opts = Options()
+    opts.add_argument('--no-first-run')
+    opts.add_argument('--no-default-browser-check')
+    # 不指定 --user-data-dir，避免部分环境下 "already in use"；若仍报错可试环境变量 SKIP_USER_DATA_DIR=0 改用临时目录
+    chrome_tmp = None
+    if os.environ.get('SKIP_USER_DATA_DIR', '1').strip() != '0':
+        pass  # 不使用 user-data-dir
+    else:
+        chrome_tmp = os.path.join(tempfile.gettempdir(), 'chrome_selenium_%s_%s' % (os.getpid(), time.time()))
+        os.makedirs(chrome_tmp, exist_ok=True)
+        opts.add_argument('--user-data-dir=' + os.path.abspath(chrome_tmp))
+    if headless:
+        opts.add_argument('--headless')
+        opts.add_argument('--no-sandbox')
+        opts.add_argument('--disable-dev-shm-usage')
+        opts.add_argument('--disable-gpu')
+    driver = webdriver.Chrome(options=opts)
 
     # 访问目标网站
     driver.get(url)
@@ -63,12 +89,19 @@ def fetch_stock_data(url):
             stock_data[item_title] = item_stock
     # 关闭浏览器
     driver.quit()
+    time.sleep(1)  # 等待进程与文件锁释放，避免下次启动报 "already in use"
+    if chrome_tmp and os.path.exists(chrome_tmp):
+        try:
+            import shutil
+            shutil.rmtree(chrome_tmp, ignore_errors=True)
+        except Exception:
+            pass
     return stock_data
 
 
 
 # 定义查询函数
-def query_stocks(urls, interval, count, stock_history):
+def query_stocks(urls, interval, count, stock_history, headless=False):
     for idx in range(count):
         current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -76,7 +109,7 @@ def query_stocks(urls, interval, count, stock_history):
 
         # 处理每个 URL
         for url in urls:
-            current_stocks = fetch_stock_data(url)
+            current_stocks = fetch_stock_data(url, headless=headless)
             for title, stock in current_stocks.items():
                 if title in stock_data:
                     stock_data[title] += stock
@@ -100,8 +133,10 @@ def query_stocks(urls, interval, count, stock_history):
 
 
 
-# 绘图并保存图像的函数
+# 绘图并保存图像的函数（需要安装 matplotlib）
 def save_stock_changes(stock_history, filename):
+    if not HAS_MATPLOTLIB:
+        raise RuntimeError('绘图需要安装 matplotlib，请运行: pip3 install matplotlib 或 sudo apt install python3-matplotlib')
     # 创建一个图和多个子图
     fig, axs = plt.subplots(len(stock_history[next(iter(stock_history))]), 1, figsize=(10, 20))
     fig.tight_layout(pad=3.0)
@@ -127,7 +162,7 @@ def save_stock_changes(stock_history, filename):
 
 # URL 列表  在''里粘贴微店网址，多个网址用,隔开
 urls = [
-  'https://k.youshop10.com/kwK7Kubw?share_relation=ebf4318fa45395b9_1470530718_1','https://k.youshop10.com/xwpp0UMJ?share_relation=697bb2ad34c22e7a_1470530718_1','https://k.youshop10.com/NVIHdFU-?share_relation=972a1b30905415e3_1470530718_1','https://k.youshop10.com/=ZzPFvy3?share_relation=b4a1fbd9ee0a9568_1470530718_1','https://k.youshop10.com/dlmBwV5q?share_relation=1187fe146a421494_1470530718_1','https://k.youshop10.com/M35EYh07?share_relation=7a9eb8b928ca0a3e_1470530718_1'
+ 'https://k.youshop10.com/AzkRRBXU?a=b&p=iphone&wfr=BuyercopyURL&share_relation=9c22c593e1d9a5e7_1470530718_1'
 ]
 
 
@@ -139,12 +174,14 @@ urls = [
 
 # 用于保存数据的字典
 # 运行查询函数，总共查询几次可以自己设置
+# 无头模式：Linux 无显示器时可设 HEADLESS=1，如 HEADLESS=1 python nize_kms.py
+headless = os.environ.get('HEADLESS', '').strip().lower() in ('1', 'true', 'yes')
 history_file = ""#如果有需要加载的就写文件名，没有就保持""
 if history_file != "":#加载之前的数据
     with open(history_file, 'r',encoding='utf-8') as f:
         stock_history = json.load(f)
-    query_stocks(urls, 1800, 300, stock_history)  # 60 seconds = 1 minutes，300 = 查询次数
+    query_stocks(urls, 1800, 300, stock_history, headless=headless)  # 60 seconds = 1 minutes，300 = 查询次数
 else:
     stock_history = {}
-    query_stocks(urls, 1800, 300, stock_history)  # 60 seconds = 5 minutes，300 = 查询次数
+    query_stocks(urls, 1800, 300, stock_history, headless=headless)  # 60 seconds = 5 minutes，300 = 查询次数
 
