@@ -1,0 +1,9 @@
+# 复制为 config.ini 后填写真实 url 与下架时间
+
+[link0]
+url = https://你的链接1
+下架时间 =
+
+[link1]
+url = https://你的链接2
+下架时间 =

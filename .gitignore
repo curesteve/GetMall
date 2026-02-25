@@ -1,0 +1,10 @@
+# 子目录中的 Git 仓库不纳入本仓库
+onlineshop/.git
+
+# 沿用 onlineshop 的忽略规则（根目录通用）
+config.ini
+*.exe
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
