@@ -1,0 +1,13 @@
+{
+  "name": "getmall",
+  "version": "1.0.0",
+  "description": "GetMall 项目",
+  "main": "index.js",
+  "scripts": {
+    "start": "echo '项目启动中...'",
+    "test": "echo '测试中...'"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT"
+}

@@ -333,4 +333,3 @@ ensure_logs_dir()
 os.makedirs(HTML_DIR, exist_ok=True)
 archive_root_jsons_to_logs()
 query_stocks(urls, 1800, 300, stock_histories, headless=headless, off_shelf_times=off_shelf_times)  # 1800 秒 = 30 分钟，300 = 查询次数
-
